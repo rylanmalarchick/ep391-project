@@ -1,0 +1,57 @@
+#include <avr/io.h> //Include my libraries
+#include <util/delay.h>
+#include <stdio.h>
+#include <math.h>
+#include <stdint.h>
+
+/*
+To Do / Implement
+Use Equation to Calc RTH, RTL, RTM
+Main Function to just do the gradient (DL)
+*/
+
+const float Vcc = 5.0;
+
+//My Thermistor (Therm 1)
+const float B1 = 4137.0; //Beta value of my thermistor
+const float R0_1 = 10770; //Ohms
+const float T0_1 = 25.6 + 273.15;
+
+const float RTH1 = 2503.0; //RT at 60 deg //R0 * exp(BVal * ((1/vTemp)-(1/t0)));
+const float RTL1 = 127230.0; //RT at -20 deg
+const float RTM1 = 13650.0; //RT at midpoint
+
+const float VOH1 = (RTM1/(RTM1 + RTH1)) * Vcc;
+const float VOL1 = (RTM1/(RTM1 + RTL1)) * Vcc;
+const float Gain1 = ((Vcc)/(VOH1 - VOL1));
+const float Offset1 = -(Gain1 * VOL1); //Ensures -20 deg cel is 0 volts
+
+
+//Thermistor 2 (Therm 2)
+const float B2 = ; //Beta value of my thermistor
+const float R0_1 = ; //Ohms
+const float T0_1 = + 273.15;
+
+const float RTH2 = ; //Maybe use equation here, maybe not
+const float RTL2 = ; //RT at -20 deg
+const float RTM2 = ; //RT at midpoint
+
+const float VOH2 = (RTM2/(RTM2 + RTH2)) * Vcc;
+const float VOL2 = (RTM2/(RTM2 + RTL2)) * Vcc;
+const float Gain2 = ((Vcc)/(VOH2 - VOL2));
+const float Offset2 = -(Gain2 * VOL2); //Ensures -20 deg cel is 0 volts
+
+typedef struct {
+    float Temperature1;
+    float Temperature2;
+    float diff;
+} TemperaturePacket;
+
+float CalcSingleTemp(Uint16_t rawADC, float gain, float offset, float BVal, float r0, float t0, float R_fixed) //r_fixed is the opposite resistor in the voltage divider
+{
+    float vOut = (rawADC / 1023.0) * VccMax;
+    float vTemp = (vOut - offset) / gain;
+    float rTemp = R_fixed * (vTemp / (Vcc - vTemp));
+    float TempK = 1.0 / ((1/t0) + (log(rTemp / r0) / bVal));
+    return TempK - 273.15;
+}

@@ -1,0 +1,23 @@
+# AVR build output
+*.o
+*.elf
+*.hex
+*.map
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Serial logs and local captures
+telemetry.csv
+*.tmp
+firmware/run
+
+# LaTeX build output
+*.aux
+*.log
+
+# Editor and OS noise
+.DS_Store
+*.swp
+*~

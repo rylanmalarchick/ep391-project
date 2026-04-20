@@ -1,57 +1,97 @@
-#include <avr/io.h> //Include my libraries
+#include <avr/io.h>
 #include <util/delay.h>
 #include <stdio.h>
 #include <math.h>
-#include <stdint.h>
+#include <stdint.h> // for uint16_t
 
-/*
-To Do / Implement
-Use Equation to Calc RTH, RTL, RTM
-Main Function to just do the gradient (DL)
-*/
+// ==========================================
+// SYSTEM POWER CONSTANTS
+// ==========================================
+const float Vcc = 5.0;       // ATmega and Thermistor Power from LM317)
+const float V_ref = -9.0;    // The negative battery powering the Op-Amp Offset
 
-const float Vcc = 5.0;
+// ==========================================
+// THERMISTOR 1 (JACOB)
+// ==========================================
+const float B1 = 4137.0; 
+const float R0_1 = 10000.0; 
+const float T0_1 = 25.0 + 273.15;
+const float RTM1 = 13500.0; //(12k + 1.5k)
 
-//My Thermistor (Therm 1)
-const float B1 = 4137.0; //Beta value of my thermistor
-const float R0_1 = 10770; //Ohms
-const float T0_1 = 25.6 + 273.15;
+// Tell the code what Op-Amp resistors you soldered:
+const float Rf_1 = 100000.0; // 100k
+const float R1_1 = 78000.0;  // (39 + 39)
+const float R2_1 = 152100.0; // (100 + 47 + 5.1)
 
-const float RTH1 = 2503.0; //RT at 60 deg //R0 * exp(BVal * ((1/vTemp)-(1/t0)));
-const float RTL1 = 127230.0; //RT at -20 deg
-const float RTM1 = 13650.0; //RT at midpoint
-
-const float VOH1 = (RTM1/(RTM1 + RTH1)) * Vcc;
-const float VOL1 = (RTM1/(RTM1 + RTL1)) * Vcc;
-const float Gain1 = ((Vcc)/(VOH1 - VOL1));
-const float Offset1 = -(Gain1 * VOL1); //Ensures -20 deg cel is 0 volts
+// The microcontroller calculates the exact physical hardware gain/offset!
+const float Gain1 = -(Rf_1 / R1_1);
+const float Offset1 = -(V_ref) * (Rf_1 / R2_1);
 
 
-//Thermistor 2 (Therm 2)
-const float B2 = ; //Beta value of my thermistor
-const float R0_1 = ; //Ohms
-const float T0_1 = + 273.15;
+// ==========================================
+// THERMISTOR 2 (TRISTEN)
+// ==========================================
+const float B2 = 3846.8; 
+const float R0_2 = 11430.0; 
+const float T0_2 = 25.0 + 273.15;
+const float RTM2 = 14000.0; //(10k + 2k + 2k)
 
-const float RTH2 = ; //Maybe use equation here, maybe not
-const float RTL2 = ; //RT at -20 deg
-const float RTM2 = ; //RT at midpoint
+// Op-Amp resistors for Thermistor 2:
+const float Rf_2 = 100000.0; // 100k
+const float R1_2 = 78000.0;  // (39 + 39)
+const float R2_2 = 152100.0; // (100 + 47 + 5.1)
 
-const float VOH2 = (RTM2/(RTM2 + RTH2)) * Vcc;
-const float VOL2 = (RTM2/(RTM2 + RTL2)) * Vcc;
-const float Gain2 = ((Vcc)/(VOH2 - VOL2));
-const float Offset2 = -(Gain2 * VOL2); //Ensures -20 deg cel is 0 volts
+const float Gain2 = -(Rf_2 / R1_2);
+const float Offset2 = -(V_ref) * (Rf_2 / R2_2);
 
+// DATA STRUCTURE
 typedef struct {
     float Temperature1;
     float Temperature2;
     float diff;
 } TemperaturePacket;
 
-float CalcSingleTemp(Uint16_t rawADC, float gain, float offset, float BVal, float r0, float t0, float R_fixed) //r_fixed is the opposite resistor in the voltage divider
+// MATH 
+float CalcSingleTemp(uint16_t rawADC, float gain, float offset, float bVal, float r0, float t0, float r_fixed) 
 {
-    float vOut = (rawADC / 1023.0) * VccMax;
+    // 1. Convert ADC (0-1023) to Voltage (0-5V)
+    float vOut = (rawADC / 1023.0) * Vcc;
+    
+    // 2. Reverse the Op-Amp equation
     float vTemp = (vOut - offset) / gain;
-    float rTemp = R_fixed * (vTemp / (Vcc - vTemp));
-    float TempK = 1.0 / ((1/t0) + (log(rTemp / r0) / bVal));
-    return TempK - 273.15;
+    
+    // 3. Reverse the Voltage Divider to find Thermistor Resistance
+    float rTemp = r_fixed * (vTemp / (Vcc - vTemp));
+    
+    // 4. Steinhart-Hart equation for Kelvin (Notice the 1.0 / to force float math!)
+    float tempK = 1.0 / ((1.0 / t0) + (log(rTemp / r0) / bVal));
+    
+    // 5. Return Celsius
+    return tempK - 273.15;
+}
+
+// ==========================================
+// MAIN LOOP
+// ==========================================
+int main(void) {
+    
+    while(1) {
+        uint16_t adc1 = 512; // Placeholder for analogRead A Something
+        uint16_t adc2 = 512; // Placeholder for analogRead A whatever +1
+        
+        TemperaturePacket packet;
+        
+        // Process Thermistor 1
+        packet.Temperature1 = CalcSingleTemp(adc1, Gain1, Offset1, B1, R0_1, T0_1, RTM1);
+        
+        // Process Thermistor 2
+        packet.Temperature2 = CalcSingleTemp(adc2, Gain2, Offset2, B2, R0_2, T0_2, RTM2);
+        
+        // Calculate Differential
+        packet.diff = fabs(packet.Temperature1 - packet.Temperature2); 
+        
+        // Transmit Data via UART here...
+        
+        _delay_ms(1000);
+    }
 }
